@@ -15,7 +15,7 @@ namespace Bcgs.WinService.Scheduler
         internal static Object globalLock = new Object();
         static void Main(string[] args)
         {
-            Console.Clear();
+            //Console.Clear();
 
 
 
