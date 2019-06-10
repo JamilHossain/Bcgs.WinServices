@@ -1,0 +1,29 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <PlatformTarget>x86</PlatformTarget>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="EntityFramework" Version="6.2.0" />
+    <PackageReference Include="log4net" Version="2.0.8" />
+    <PackageReference Include="MySql.Data" Version="8.0.16" />
+    <PackageReference Include="MySql.Data.Entity" Version="6.10.8" />
+    <PackageReference Include="System.ComponentModel.Annotations" Version="4.5.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Bcgs.ZKTeco.BioMatrix\Bcgs.ZKTeco.BioMatrix.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="BasecampSMSLib">
+      <HintPath>dlls\BasecampSMSLib.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>
