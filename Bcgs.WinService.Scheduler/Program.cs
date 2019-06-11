@@ -17,8 +17,6 @@ namespace Bcgs.WinService.Scheduler
         {
             //Console.Clear();
 
-
-
             BcgsService service = new BcgsService(logger);
             Boolean consoleRun = Environment.UserInteractive;
             if (args.Length > 0)
