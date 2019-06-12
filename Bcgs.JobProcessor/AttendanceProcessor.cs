@@ -110,6 +110,7 @@ namespace Bcgs.JobProcessor
             DateTime lastProcessDate = DateTime.MinValue;
             try
             {
+                logger.Info($"GetBioMatrixData - Start Time: {DateTime.Now.ToString("MM/dd/yyyy h:mm:ss tt")}");
 
                 ICollection<Bcgs.ZKTeco.BioMatrix.Models.BioMatrixLog> biomatrixLogData;
                 using (ZkTecoClient bioMatrixClient = new ZkTecoClient("basecampzkteco.ddns.net"))
@@ -117,6 +118,7 @@ namespace Bcgs.JobProcessor
                     biomatrixLogData = bioMatrixClient.GetBioMatrixData();
                 }
 
+                logger.Info($"GetBioMatrixData - End Time: {DateTime.Now.ToString("MM/dd/yyyy h:mm:ss tt")}");
 
                 //ICollection<Bcgs.ZKTeco.BioMatrix.Models.BioMatrixLog> biomatrixLogData = new HashSet<Bcgs.ZKTeco.BioMatrix.Models.BioMatrixLog>();
                 //biomatrixLogData.Add(new ZKTeco.BioMatrix.Models.BioMatrixLog
@@ -253,6 +255,7 @@ namespace Bcgs.JobProcessor
             DateTime processDate = DateTime.Now.Date;
             if (!dbContext.StaffAttendences.Any(x => x.date == processDate))
             {
+                logger.Info($"MakeStaffAbsent - Start Time: {DateTime.Now.ToString("MM/dd/yyyy h:mm:ss tt")}");
                 var staffs = dbContext.Staffs.Where(x => x.is_active > 0).ToList();
                 int attendance_type_id = GetAttendanceType(false, dbContext);
 
@@ -271,6 +274,7 @@ namespace Bcgs.JobProcessor
                 }
 
                 dbContext.SaveChanges();
+                logger.Info($"MakeStaffAbsent - End Time: {DateTime.Now.ToString("MM/dd/yyyy h:mm:ss tt")}");
             }
         }
 
@@ -279,6 +283,8 @@ namespace Bcgs.JobProcessor
             DateTime processDate = DateTime.Now.Date;
             if (!dbContext.StudentAttendences.Any(x => x.date == processDate))
             {
+                logger.Info($"MakeStudentAbsent - Start Time: {DateTime.Now.ToString("MM/dd/yyyy h:mm:ss tt")}");
+
                 var students = dbContext.Students.Where(x => x.is_active == "yes")
                                    .Include(x => x.StudentSessions)
                                    .ToList();
@@ -302,6 +308,8 @@ namespace Bcgs.JobProcessor
                 }
 
                 dbContext.SaveChanges();
+                logger.Info($"MakeStudentAbsent - End Time: {DateTime.Now.ToString("MM/dd/yyyy h:mm:ss tt")}");
+
             }
 
         }
@@ -497,6 +505,8 @@ namespace Bcgs.JobProcessor
                 BasecampSMSSender smssender = new BasecampSMSSender("sazzadul.islam@asdbd.com", "abc987");
 
                 string res = smssender.SendSms(student.guardian_phone, smsContent);
+                logger.Info($"SMS - {smsContent} {Environment.NewLine}Time: {DateTime.Now.ToString("MM/dd/yyyy h:mm:ss tt")} Status: {res}");
+
                 return res.Contains("200");
             }
 
