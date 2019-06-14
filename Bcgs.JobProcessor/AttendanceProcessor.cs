@@ -149,36 +149,48 @@ namespace Bcgs.JobProcessor
                     }
 
 
-                    biomatrixLogData = biomatrixLogData.Where(x => x.DateTimeRecord > lastProcessDate).ToList();
-
-
-                    foreach (var log in biomatrixLogData)
-                    {
-                        try
-                        {
-
-
+                    biomatrixLogData = biomatrixLogData.Where(x => x.DateTimeRecord > lastProcessDate)
+                                        .OrderBy(x=>x.DateTimeRecord).ToList();
+                    try
+                    { 
+                        foreach (var log in biomatrixLogData)
+                        { 
                             dbContext.BioMatrixLogs.Add(new Data.Models.BioMatrixLog
-                            {
-                                machine_id = log.MachineNumber,
-                                ind_reg_iD = log.IndRegID,
-                                datetime_record = log.DateTimeRecord
-                            });
-                            ///Save BioMatrixLogs
-                            dbContext.SaveChanges();
-
-
-                            bool isStudentLog = this.UpdateStudentAttendanceStatus(log, dbContext);
-                            if (!isStudentLog)
-                            {
-                                this.UpdateStaffAttendanceStatus(log, dbContext);
-                            }
-
+                                {
+                                    machine_id = log.MachineNumber,
+                                    ind_reg_iD = log.IndRegID,
+                                    datetime_record = log.DateTimeRecord
+                                });
+                        
                         }
-                        catch (Exception ex)
+
+                        ///Save BioMatrixLogs
+                        dbContext.SaveChanges();
+                   
+                     
+
+                        foreach (var log in biomatrixLogData)
                         {
-                            logger.Info(ex.Message, ex);
+                            try
+                            { 
+                                bool isStudentLog = this.UpdateStudentAttendanceStatus(log, dbContext);
+                                if (!isStudentLog)
+                                {
+                                    this.UpdateStaffAttendanceStatus(log, dbContext);
+                                }
+
+                            }
+                            catch (Exception ex)
+                            {
+                                logger.Info(ex.Message, ex);
+                            }
                         }
+                        //Update Student/Staff Attendance Status
+                        dbContext.SaveChanges();
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.Info(ex.Message, ex);
                     }
                 }
             }
@@ -423,7 +435,7 @@ namespace Bcgs.JobProcessor
                     }
                 }
 
-                dbContext.SaveChanges();
+                
 
             }
 
@@ -492,7 +504,7 @@ namespace Bcgs.JobProcessor
                 }
             }
 
-            dbContext.SaveChanges();
+            
         }
 
 
@@ -505,7 +517,7 @@ namespace Bcgs.JobProcessor
                 BasecampSMSSender smssender = new BasecampSMSSender("sazzadul.islam@asdbd.com", "abc987");
 
                 string res = smssender.SendSms(student.guardian_phone, smsContent);
-                logger.Info($"SMS - {smsContent} {Environment.NewLine}Time: {DateTime.Now.ToString("MM/dd/yyyy h:mm:ss tt")} Status: {res}");
+                logger.Info($"SMS - {smsContent} {Environment.NewLine}Status: {res}");
 
                 return res.Contains("200");
             }

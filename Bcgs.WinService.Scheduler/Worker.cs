@@ -32,11 +32,21 @@ namespace Bcgs.WinService.Scheduler
             isworking = true;
             while (isworking)
             {
-                attendanceProcessor.ExecuteAttendanceJobAsync();               
+                try 
+	            {	        
+		            attendanceProcessor.ExecuteAttendanceJobAsync();               
 
-                if (i == 3600) i = 0;
-                i += 10;
-                System.Threading.Thread.Sleep(1000*10);
+                    if (i == 3600) i = 0;
+
+                    i += 10;
+                    System.Threading.Thread.Sleep(1000*10);
+	            }
+	            catch (Exception ex)
+	            {
+
+		            logger.Error(ex.Message,ex);
+	            }
+               
             }
         }
        
