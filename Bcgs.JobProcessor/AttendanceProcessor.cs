@@ -389,7 +389,7 @@ namespace Bcgs.JobProcessor
                 var attendance = dbContext.StudentAttendences.Where(x => x.student_session_id == sessionId
                                 && x.date == processDate).FirstOrDefault();
 
-                int attTypeId = DateTime.Now.TimeOfDay <= this.AttendanceConfig.shift1_late_attendance_cutoff_time ? StudentPresentTypeId : StudentLatePresentTypeId;
+                int attTypeId = signInData.SignIn.TimeOfDay <= this.AttendanceConfig.shift1_late_attendance_cutoff_time ? StudentPresentTypeId : StudentLatePresentTypeId;
 
                 if (attendance != null)
                 {
@@ -397,12 +397,13 @@ namespace Bcgs.JobProcessor
                     {
                         attendance.attendence_type_id = attTypeId; //Present=1, Late=3
                         attendance.is_active = "yes";
-                        attendance.created_at = log.DateTimeRecord;
+                        attendance.created_at = signInData.SignIn;
                         attendance.updated_at = log.DateTimeRecord;
 
                     }
                     else
                     {
+                        attendance.attendence_type_id = attTypeId; //Present=1, Late=3
                         attendance.is_active = signInData.PunchCount % 2 == 0 ? "no" : "yes";
                         attendance.updated_at = log.DateTimeRecord;
                     }
