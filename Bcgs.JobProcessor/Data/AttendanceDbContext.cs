@@ -20,7 +20,7 @@ namespace Bcgs.JobProcessor.Data
         public DbSet<AttendanceJobConfig> AttendanceJobConfigs { get; set; }
         public DbSet<StudentAttendence> StudentAttendences { get; set; }
         public DbSet<StaffAttendence> StaffAttendences { get; set; }
-        public DbSet<BioMatrixLog> BioMatrixLogs { get; set; }
+        public DbSet<BiometricLog> BiometricLogs { get; set; }
         public DbSet<StudentSession> StudentSessions { get; set; }
         public DbSet<Student> Students { get; set; }
         public DbSet<CalendarHoliday> CalendarHolidays { get; set; }
@@ -72,8 +72,8 @@ namespace Bcgs.JobProcessor.Data
                 .WithMany(g => g.StudentSessions)
                 .HasForeignKey<int>(s => s.student_id);
 
-            modelBuilder.Entity<BioMatrixLog>()
-                .ToTable("biomatrix_log")
+            modelBuilder.Entity<BiometricLog>()
+                .ToTable("Biometric_log")
                 .HasKey(e => e.id);
 
             modelBuilder.Entity<Staff>()

@@ -20,6 +20,8 @@ namespace Bcgs.JobProcessor
         private DateTime DailyProcess_LastRunTime { get; set; } = DateTime.MinValue;
         private DateTime ProcessAttendanceLog_LastRunTime { get; set; } = DateTime.MinValue;
         private DateTime SendAbsentSms_LastRunTime { get; set; } = DateTime.MinValue;
+        private bool sentBiometricDeviceError = false;
+        private string AdminPhoneNo = "";
 
         private bool IsBusy { get; set; } = false;
 
@@ -61,7 +63,7 @@ namespace Bcgs.JobProcessor
 
 
             this.IsBusy = true;
-            logger.Info($"InitiateDailyAttendanceProcessAsync - Start Time: {DateTime.Now.ToString("MM/dd/yyyy h:mm:ss tt")}");
+            logger.Info($"InitiateDailyAttendanceProcessAsync - Start ");
 
 
             this.DailyProcess_LastRunTime = DateTime.Now;
@@ -82,11 +84,11 @@ namespace Bcgs.JobProcessor
             finally
             {
                 this.IsBusy = false;
-                logger.Info($"InitiateDailyAttendanceProcessAsync - End Time: {DateTime.Now.ToString("MM/dd/yyyy h:mm:ss tt")}");
+                logger.Info($"InitiateDailyAttendanceProcessAsync - End");
             }
 
         }
-        
+
         private void ProcessDailyAttendanceLog()
         {
 
@@ -101,45 +103,36 @@ namespace Bcgs.JobProcessor
                 return;
             }
 
-            logger.Info($"ProcessAttendanceLogAsync - Start Time: {DateTime.Now.ToString("MM/dd/yyyy h:mm:ss tt")}");
+            logger.Info($"ProcessAttendanceLogAsync - Start");
 
             this.IsBusy = true;
 
 
             this.ProcessAttendanceLog_LastRunTime = DateTime.Now;
             DateTime lastProcessDate = DateTime.MinValue;
+            ICollection<BioMatrixLog> biometricLogData = new HashSet<BioMatrixLog>();
+
+
+
             try
             {
-                logger.Info($"GetBioMatrixData - Start Time: {DateTime.Now.ToString("MM/dd/yyyy h:mm:ss tt")}");
 
-                ICollection<Bcgs.ZKTeco.BioMatrix.Models.BioMatrixLog> biomatrixLogData;
-                using (ZkTecoClient bioMatrixClient = new ZkTecoClient("basecampzkteco.ddns.net"))
+                logger.Info($"\tGetBiometricData - Start");
+
+
+                using (ZkTecoClient BiometricClient = new ZkTecoClient("basecampzkteco.ddns.net"))
                 {
-                    biomatrixLogData = bioMatrixClient.GetBioMatrixData();
+                    biometricLogData = BiometricClient.GetBiometricData();
+                    sentBiometricDeviceError = false;
                 }
 
-                logger.Info($"GetBioMatrixData - End Time: {DateTime.Now.ToString("MM/dd/yyyy h:mm:ss tt")}");
-
-                //ICollection<Bcgs.ZKTeco.BioMatrix.Models.BioMatrixLog> biomatrixLogData = new HashSet<Bcgs.ZKTeco.BioMatrix.Models.BioMatrixLog>();
-                //biomatrixLogData.Add(new ZKTeco.BioMatrix.Models.BioMatrixLog
-                //{
-                //    MachineNumber = 1,
-                //    IndRegID = 19040001,
-                //    DateTimeRecord1 = DateTime.Now.ToString()
-                //});
-                //biomatrixLogData.Add(new ZKTeco.BioMatrix.Models.BioMatrixLog
-                //{
-                //    MachineNumber = 1,
-                //    IndRegID = 18010002,
-                //    DateTimeRecord1 = DateTime.Now.ToString()
-                //});
-
+                logger.Info("GetBiometricData - End");
 
                 using (AttendanceDbContext dbContext = new AttendanceDbContext())
                 {
-                    if (dbContext.BioMatrixLogs.Any())
+                    if (dbContext.BiometricLogs.Any())
                     {
-                        lastProcessDate = dbContext.BioMatrixLogs.Max(x => x.datetime_record);
+                        lastProcessDate = dbContext.BiometricLogs.Max(x => x.datetime_record);
                     }
 
                     if (this.DailyProcess_LastRunTime.Date < DateTime.Now.Date)
@@ -149,30 +142,28 @@ namespace Bcgs.JobProcessor
                     }
 
 
-                    biomatrixLogData = biomatrixLogData.Where(x => x.DateTimeRecord > lastProcessDate)
-                                        .OrderBy(x=>x.DateTimeRecord).ToList();
+                    biometricLogData = biometricLogData.Where(x => x.DateTimeRecord > lastProcessDate)
+                                        .OrderBy(x => x.DateTimeRecord).ToList();
                     try
-                    { 
-                        foreach (var log in biomatrixLogData)
-                        { 
-                            dbContext.BioMatrixLogs.Add(new Data.Models.BioMatrixLog
-                                {
-                                    machine_id = log.MachineNumber,
-                                    ind_reg_iD = log.IndRegID,
-                                    datetime_record = log.DateTimeRecord
-                                });
-                        
+                    {
+                        foreach (var log in biometricLogData)
+                        {
+                            dbContext.BiometricLogs.Add(new Data.Models.BiometricLog
+                            {
+                                machine_id = log.MachineNumber,
+                                ind_reg_iD = log.IndRegID,
+                                datetime_record = log.DateTimeRecord
+                            });
+
                         }
 
-                        ///Save BioMatrixLogs
+                        ///Save BiometricLogs
                         dbContext.SaveChanges();
-                   
-                     
 
-                        foreach (var log in biomatrixLogData)
+                        foreach (var log in biometricLogData)
                         {
                             try
-                            { 
+                            {
                                 bool isStudentLog = this.UpdateStudentAttendanceStatus(log, dbContext);
                                 if (!isStudentLog)
                                 {
@@ -193,6 +184,17 @@ namespace Bcgs.JobProcessor
                         logger.Info(ex.Message, ex);
                     }
                 }
+            }
+            catch (ZkTecoClientException ex)
+            {
+                if (!this.sentBiometricDeviceError)
+                {
+                    this.sentBiometricDeviceError = true;
+                    this.SendServiceStetusSms(ex.Message);
+                }
+
+                logger.Error(ex.Message, ex);
+
             }
             catch (Exception ex)
             {
@@ -359,7 +361,7 @@ namespace Bcgs.JobProcessor
 
         private bool UpdateStudentAttendanceStatus(ZKTeco.BioMatrix.Models.BioMatrixLog log, AttendanceDbContext dbContext)
         {
-            DateTime processDate = DateTime.Now.Date;
+            DateTime processDate = log.DateTimeRecord.Date;
             Student student = dbContext.Students.Where(x => x.admission_no == log.IndRegID)
                            .Include(x => x.StudentSessions)
                            .FirstOrDefault();
@@ -372,15 +374,15 @@ namespace Bcgs.JobProcessor
             int sessionId = student.StudentSessions.Last().id;
 
             ///Find latest log
-            var signInData = dbContext.BioMatrixLogs.Where(x => x.ind_reg_iD == log.IndRegID
+            var signInData = dbContext.BiometricLogs.Where(x => x.ind_reg_iD == log.IndRegID
                             && x.datetime_record > processDate)
                 .GroupBy(x => x.ind_reg_iD)
                 .Select(x => new
                 {
                     RegId = x.Key,
                     SignIn = x.Min(y => y.datetime_record),
-                    SignOut = x.Count() > 1 ? x.Max(y => y.datetime_record) : DateTime.MinValue,
-                    IsSignInLog = x.Count() == 1,
+                    SignOut = x.Count() > 1 ? x.Max(y => y.datetime_record) : DateTime.Now.Date,
+                    IsSignInLog = x.Min(y => y.datetime_record) == log.DateTimeRecord,
                     PunchCount = x.Count()
                 }).FirstOrDefault();
 
@@ -424,7 +426,7 @@ namespace Bcgs.JobProcessor
 
                 }
 
-                if (signInData.IsSignInLog)
+                if (signInData.IsSignInLog && processDate == DateTime.Now.Date)
                 {
                     if (this.SendSms(attTypeId == StudentPresentTypeId ? SmsType.Present : SmsType.Late, student, log.DateTimeRecord))
                     {
@@ -435,9 +437,6 @@ namespace Bcgs.JobProcessor
                         attendance.remark = "SMS fail to send!";
                     }
                 }
-
-                
-
             }
 
 
@@ -455,8 +454,8 @@ namespace Bcgs.JobProcessor
                 return;
             }
 
-            ///get BioMatrix Logs according to process date and employee id
-            var signInData = dbContext.BioMatrixLogs.Where(x => x.ind_reg_iD == log.IndRegID
+            ///get Biometric Logs according to process date and employee id
+            var signInData = dbContext.BiometricLogs.Where(x => x.ind_reg_iD == log.IndRegID
                             && x.datetime_record > processDate)
                 .GroupBy(x => x.ind_reg_iD)
                 .Select(x => new
@@ -505,11 +504,11 @@ namespace Bcgs.JobProcessor
                 }
             }
 
-            
+
         }
 
 
-     
+
         private bool SendSms(SmsType smsType, Student student, DateTime dateTimeRecord)
         {
             if (this.AttendanceConfig.is_enable_sms_service)
@@ -518,12 +517,22 @@ namespace Bcgs.JobProcessor
                 BasecampSMSSender smssender = new BasecampSMSSender("sazzadul.islam@asdbd.com", "abc987");
 
                 string res = smssender.SendSms(student.guardian_phone, smsContent);
-                logger.Info($"SMS - {smsContent} {Environment.NewLine}Status: {res}");
+                logger.Info($"SMS - {student.guardian_name} {student.guardian_phone} {Environment.NewLine}{smsContent} {Environment.NewLine}Status: {res}{Environment.NewLine}");
 
                 return res.Contains("200");
             }
 
             return false;
+        }
+
+        private bool SendServiceStetusSms(string msg)
+        {
+            BasecampSMSSender smssender = new BasecampSMSSender("sazzadul.islam@asdbd.com", "abc987");
+
+            string res = smssender.SendSms(AdminPhoneNo, msg);
+            logger.Info($"SMS Notification {Environment.NewLine} {msg} {Environment.NewLine}Status: {res} {Environment.NewLine}");
+
+            return res.Contains("200");
         }
 
         private string PrepareSmsContent(SmsType smsType, Student student, DateTime dateTimeRecord)

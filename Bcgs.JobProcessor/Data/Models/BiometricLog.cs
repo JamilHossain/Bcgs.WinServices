@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Bcgs.JobProcessor.Data.Models
 {
-    public class BioMatrixLog
+    public class BiometricLog
     {
         public int id { get; set; }
         public int machine_id { get; set; }

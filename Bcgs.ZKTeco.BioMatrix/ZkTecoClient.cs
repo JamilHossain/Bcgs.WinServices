@@ -37,8 +37,6 @@ namespace Bcgs.ZKTeco.BioMatrix
 
             try
             {
-
-
                 if (IsDeviceConnected)
                 {
                     //IsDeviceConnected = false;
@@ -47,12 +45,12 @@ namespace Bcgs.ZKTeco.BioMatrix
                 }
 
                 if (this.DeviceIP == string.Empty || this.PortNumber < 1)
-                    throw new Exception("The Device IP Address and Port is mandotory !!");
+                    throw new ZkTecoClientException("The Device IP Address and Port is mandotory !!");
 
 
                 bool isValidIpA = UniversalStatic.ValidateIP(this.DeviceIP);
                 if (!isValidIpA)
-                    throw new Exception("The Device IP is invalid !!");
+                    throw new ZkTecoClientException("The Device IP is invalid !!");
 
                 isValidIpA = UniversalStatic.PingTheDevice(this.DeviceIP);
                 if (!isValidIpA)
@@ -61,7 +59,7 @@ namespace Bcgs.ZKTeco.BioMatrix
                     isValidIpA = UniversalStatic.PingTheDevice(this.DeviceIP);
 
                     if (!isValidIpA)
-                        throw new Exception("The device at " + this.DeviceIP + ":" + this.PortNumber + " did not respond!!");
+                        throw new ZkTecoClientException("The device at " + this.DeviceIP + ":" + this.PortNumber + " did not respond!!");
                 }
                 objZkeeper = new ZkemService(RaiseDeviceEvent);
                 IsDeviceConnected = objZkeeper.Connect_Net(this.DeviceIP, this.PortNumber);
@@ -73,7 +71,7 @@ namespace Bcgs.ZKTeco.BioMatrix
                 }
 
             }
-            catch (Exception ex)
+            catch (ZkTecoClientException ex)
             {
                 throw ex;
             }
@@ -105,30 +103,27 @@ namespace Bcgs.ZKTeco.BioMatrix
         //        return lstMachineInfo;
         //}
 
-        public ICollection<BioMatrixLog> GetBioMatrixData()
+        public ICollection<BioMatrixLog> GetBiometricData()
         {
 
             IPAddress[] ipaddress = Dns.GetHostAddresses(this.HostName);
+            ICollection<BioMatrixLog> logs = new HashSet<BioMatrixLog>();
+
             if (ipaddress.Length > 0)
             {
                 this.DeviceIP = ipaddress[0].ToString();
             }
 
-            this.ConnectToZKTeco();
-
-            ICollection<BioMatrixLog> logs = manipulator.GetLogData(objZkeeper, this.MachineNumber);
-
-            objZkeeper.Disconnect();
-
+            if (this.ConnectToZKTeco())
+            {
+                logs = manipulator.GetLogData(objZkeeper, this.MachineNumber);
+                objZkeeper.Disconnect();
+            }
+            else
+            {
+                throw new ZkTecoClientException($"Failed to connect to Biometric Device at {this.DeviceIP}: {this.PortNumber}");
+            }
             return logs;
-
-            //foreach (BioMatrixLog log in logs.OrderByDescending(x => x.DateOnlyRecord).Take(100))//TODO: Remove take
-            //{
-
-            //}
-
-
-
         }
 
         public void TestDBConnection()
