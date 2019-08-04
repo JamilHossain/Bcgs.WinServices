@@ -124,8 +124,8 @@ namespace Bcgs.JobProcessor
                 {
                     this.AttendanceConfig = dbContext.AttendanceJobConfigs.FirstOrDefault();
 
-                    MakeStaffAbsent(dbContext);
-                    MakeStudentAbsent(dbContext);
+                    MakeStaffAbsent(dbContext, DateTime.Now.Date);
+                    MakeStudentAbsent(dbContext, DateTime.Now.Date);
                 }
             }
             catch (Exception ex)
@@ -175,6 +175,7 @@ namespace Bcgs.JobProcessor
                 {
                     biometricLogData = biometricClient.GetBiometricData();
                     SentBiometricDeviceError = false;
+                    logger.Info($"{biometricLogData.Count} records found.");
                 }
 
                 logger.Info("Get Biometric Data - End");
@@ -186,17 +187,13 @@ namespace Bcgs.JobProcessor
                         lastProcessDate = dbContext.BiometricLogs.Max(x => x.datetime_record);
                     }
 
-                    if (this.DailyProcess_LastRunTime.Date < DateTime.Now.Date)
-                    {
-                        this.MakeStudentAbsent(dbContext);
-                        this.MakeStaffAbsent(dbContext);
-                    }
-
-
                     biometricLogData = biometricLogData.Where(x => x.DateTimeRecord > lastProcessDate)
                                         .OrderBy(x => x.DateTimeRecord).ToList();
+
+
                     try
                     {
+
                         foreach (var log in biometricLogData)
                         {
                             dbContext.BiometricLogs.Add(new Data.Models.BiometricLog
@@ -211,7 +208,16 @@ namespace Bcgs.JobProcessor
                         ///Save BiometricLogs
                         dbContext.SaveChanges();
 
-                        foreach (var log in biometricLogData)
+                        ICollection<BiometricLog> unprocessedBiometricLogData = dbContext.BiometricLogs
+                            .Where(x => !x.is_processed).OrderBy(x => x.datetime_record).ToList();
+
+                        foreach (DateTime date in unprocessedBiometricLogData.Select(x => x.datetime_record.Date).Distinct())
+                        {
+                            this.MakeStudentAbsent(dbContext, date);
+                            this.MakeStaffAbsent(dbContext, date);
+                        }
+
+                        foreach (var log in unprocessedBiometricLogData)
                         {
                             try
                             {
@@ -221,6 +227,9 @@ namespace Bcgs.JobProcessor
                                     this.UpdateStaffAttendanceStatus(log, dbContext);
                                 }
 
+                                log.is_processed = true;
+                                
+                                dbContext.SaveChanges();
                             }
                             catch (Exception ex)
                             {
@@ -319,14 +328,14 @@ namespace Bcgs.JobProcessor
             }
         }
 
-        private void MakeStaffAbsent(AttendanceDbContext dbContext)
+        private void MakeStaffAbsent(AttendanceDbContext dbContext, DateTime processDate)
         {
-            DateTime processDate = DateTime.Now.Date;
+            //DateTime processDate = DateTime.Now.Date;
             if (!dbContext.StaffAttendences.Any(x => x.date == processDate))
             {
-                logger.Info($"Make Staff Absent - Start".ToUpper());
+                logger.Info($"Make Staff Absent (Date: {processDate}) - Start".ToUpper());
                 var staffs = dbContext.Staffs.Where(x => x.is_active > 0).ToList();
-                int attendance_type_id = GetAttendanceType(false, dbContext);
+                int attendance_type_id = GetAttendanceType(false, dbContext, processDate);
 
                 foreach (var staff in staffs)
                 {
@@ -347,18 +356,18 @@ namespace Bcgs.JobProcessor
             }
         }
 
-        private void MakeStudentAbsent(AttendanceDbContext dbContext)
+        private void MakeStudentAbsent(AttendanceDbContext dbContext, DateTime processDate)
         {
-            DateTime processDate = DateTime.Now.Date;
+            //DateTime processDate = DateTime.Now.Date;
             if (!dbContext.StudentAttendences.Any(x => x.date == processDate))
             {
-                logger.Info($"Make Student Absent - Start".ToUpper());
+                logger.Info($"Make Student Absent (Date: {processDate}) - Start".ToUpper());
 
                 var students = dbContext.Students.Where(x => x.is_active == "yes")
                                    .Include(x => x.StudentSessions)
                                    .ToList();
 
-                int attendance_type_id = GetAttendanceType(true, dbContext);
+                int attendance_type_id = GetAttendanceType(true, dbContext, processDate);
 
                 foreach (var student in students)
                 {
@@ -383,9 +392,9 @@ namespace Bcgs.JobProcessor
 
         }
 
-        private int GetAttendanceType(bool isStudent, AttendanceDbContext dbContext)
+        private int GetAttendanceType(bool isStudent, AttendanceDbContext dbContext, DateTime processDate)
         {
-            DateTime processDate = DateTime.Now.Date;
+            //DateTime processDate = DateTime.Now.Date;
             int attendance_type_id = isStudent ? StudentAbsentTypeId : StaffAbsentTypeId;
 
             if (processDate.DayOfWeek == DayOfWeek.Friday || processDate.DayOfWeek == DayOfWeek.Saturday)
@@ -414,21 +423,22 @@ namespace Bcgs.JobProcessor
             }
         }
 
-        private bool UpdateStudentAttendanceStatus(ZKTeco.BioMatrix.Models.BiometricLogModel log, AttendanceDbContext dbContext)
+        private bool UpdateStudentAttendanceStatus(BiometricLog log, AttendanceDbContext dbContext)
         {
-            DateTime processDate = log.DateTimeRecord.Date;
-            Student student = dbContext.Students.Where(x => x.admission_no == log.IndRegID)
+            DateTime processDate = log.datetime_record.Date;
+            Student student = dbContext.Students.Where(x => x.admission_no == log.ind_reg_iD)
                            .Include(x => x.StudentSessions)
                            .FirstOrDefault();
 
             if (student == null)
             {
+
                 return false;
             }
 
             int sessionId = student.StudentSessions.Last().id;
 
-            var signInData = dbContext.BiometricLogs.Where(x => x.ind_reg_iD == log.IndRegID
+            var signInData = dbContext.BiometricLogs.Where(x => x.ind_reg_iD == log.ind_reg_iD
                             && x.datetime_record > processDate)
                 .GroupBy(x => x.ind_reg_iD)
                 .Select(x => new
@@ -436,14 +446,14 @@ namespace Bcgs.JobProcessor
                     RegId = x.Key,
                     SignIn = x.Min(y => y.datetime_record),
                     SignOut = x.Count() > 1 ? x.Max(y => y.datetime_record) : processDate,
-                    IsSignInLog = x.Min(y => y.datetime_record) == log.DateTimeRecord,
+                    IsSignInLog = x.Min(y => y.datetime_record) == log.datetime_record,
                     PunchCount = x.Count()
                 }).FirstOrDefault();
 
 
             if (signInData != null)
             {
-                logger.Info($"Record Date Time: {log.DateTimeRecord}, Student Name: {student.firstname} {student.lastname}, ID: {log.IndRegID}, Sign In: {signInData.SignIn}, Sign Out: {signInData.SignOut}, Is Sign In Log: {signInData.IsSignInLog}");
+                logger.Info($"Record Date Time: {log.datetime_record}, Student Name: {student.firstname} {student.lastname}, ID: {log.ind_reg_iD}, Sign In: {signInData.SignIn}, Sign Out: {signInData.SignOut}, Is Sign In Log: {signInData.IsSignInLog}");
 
                 var attendance = dbContext.StudentAttendences.Where(x => x.student_session_id == sessionId
                                 && x.date == processDate).FirstOrDefault();
@@ -459,14 +469,14 @@ namespace Bcgs.JobProcessor
                         attendance.attendence_type_id = attTypeId; //Present=1, Late=3
                         attendance.is_active = "yes";
                         attendance.created_at = signInData.SignIn;
-                        attendance.updated_at = log.DateTimeRecord;
+                        attendance.updated_at = log.datetime_record;
 
                     }
                     else
                     {
                         attendance.attendence_type_id = attTypeId; //Present=1, Late=3
                         attendance.is_active = signInData.PunchCount % 2 == 0 ? "no" : "yes";
-                        attendance.updated_at = log.DateTimeRecord;
+                        attendance.updated_at = log.datetime_record;
                     }
                 }
                 else
@@ -479,15 +489,15 @@ namespace Bcgs.JobProcessor
                         date = processDate,
                         is_active = "yes",
                         remark = "",
-                        created_at = log.DateTimeRecord,
-                        updated_at = log.DateTimeRecord
+                        created_at = log.datetime_record,
+                        updated_at = log.datetime_record
                     });
 
                 }
 
                 if (signInData.IsSignInLog && processDate == DateTime.Now.Date)
                 {
-                    if (this.SendSms(attTypeId == StudentPresentTypeId ? SmsType.Present : SmsType.Late, student, log.DateTimeRecord))
+                    if (this.SendSms(attTypeId == StudentPresentTypeId ? SmsType.Present : SmsType.Late, student, log.datetime_record))
                     {
                         attendance.remark = "SMS sent.";
                     }
@@ -496,25 +506,29 @@ namespace Bcgs.JobProcessor
                         attendance.remark = "SMS fail to send!";
                     }
                 }
+
+                
             }
 
 
             return true;
         }
 
-        private void UpdateStaffAttendanceStatus(ZKTeco.BioMatrix.Models.BiometricLogModel log, AttendanceDbContext dbContext)
+        private void UpdateStaffAttendanceStatus(BiometricLog log, AttendanceDbContext dbContext)
         {
-            DateTime processDate = log.DateTimeRecord.Date;
-            var staff = dbContext.Staffs.Where(x => x.employee_id == log.IndRegID.ToString())
+            DateTime processDate = log.datetime_record.Date;
+            var staff = dbContext.Staffs.Where(x => x.employee_id == log.ind_reg_iD.ToString())
                            .FirstOrDefault();
 
             if (staff == null)
             {
+                logger.Info($"ID: {log.ind_reg_iD} not found.");
+              
                 return;
             }
 
             ///get Biometric Logs according to process date and employee id
-            var signInData = dbContext.BiometricLogs.Where(x => x.ind_reg_iD == log.IndRegID
+            var signInData = dbContext.BiometricLogs.Where(x => x.ind_reg_iD == log.ind_reg_iD
                             && x.datetime_record > processDate)
                 .GroupBy(x => x.ind_reg_iD)
                 .Select(x => new
@@ -522,13 +536,13 @@ namespace Bcgs.JobProcessor
                     RegId = x.Key,
                     SignIn = x.Min(y => y.datetime_record),
                     SignOut = x.Count() > 1 ? x.Max(y => y.datetime_record) : processDate,
-                    IsSignInLog = x.Min(y => y.datetime_record) == log.DateTimeRecord,
+                    IsSignInLog = x.Min(y => y.datetime_record) == log.datetime_record,
                     PunchCount = x.Count()
                 }).FirstOrDefault();
 
             if (signInData != null)
             {
-                logger.Info($"Record Date Time: {log.DateTimeRecord}, Student Name: {staff.name}, ID: {log.IndRegID}, Sign In: {signInData.SignIn}, Sign Out:{signInData.SignOut}, Is Sign In Log:{signInData.IsSignInLog}");
+                logger.Info($"Record Date Time: {log.datetime_record}, Staff Name: {staff.name}, ID: {log.ind_reg_iD}, Sign In: {signInData.SignIn}, Sign Out: {signInData.SignOut}, Is Sign In Log: {signInData.IsSignInLog}");
 
 
                 var attendance = dbContext.StaffAttendences.Where(x => x.staff_id == staff.id
@@ -536,20 +550,21 @@ namespace Bcgs.JobProcessor
 
                 if (attendance != null)
                 {
-                    int attTypeId = DateTime.Now.TimeOfDay <= this.AttendanceConfig.staff_late_attendance_cutoff_time ? StaffPresentTypeId : StaffLatePresentTypeId;
+                    int attTypeId = signInData.SignIn.TimeOfDay <= this.AttendanceConfig.staff_late_attendance_cutoff_time ? StaffPresentTypeId : StaffLatePresentTypeId;
 
                     if (signInData.IsSignInLog)
                     {
                         attendance.staff_attendance_type_id = attTypeId;
                         attendance.is_active = 1;
-                        attendance.created_at = DateTime.Now;
-                        attendance.updated_at = DateTime.Now;
+                        attendance.created_at = signInData.SignIn;
+                        attendance.updated_at = log.datetime_record;
                     }
                     else
                     {
                         attendance.staff_attendance_type_id = attTypeId; //Present=1, Late=3
                         attendance.is_active = signInData.PunchCount % 2 == 0 ? 0 : 1;
-                        attendance.updated_at = DateTime.Now;
+
+                        attendance.updated_at = log.datetime_record;
                     }
                 }
                 else
@@ -561,11 +576,12 @@ namespace Bcgs.JobProcessor
                         date = processDate,
                         is_active = 1,
                         remark = "",
-                        created_at = DateTime.Now,
-                        updated_at = DateTime.Now
+                        created_at = signInData.SignIn,
+                        updated_at = log.datetime_record
                     });
 
                 }
+                
             }
 
 

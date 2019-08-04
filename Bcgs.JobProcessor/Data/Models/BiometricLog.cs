@@ -10,5 +10,6 @@ namespace Bcgs.JobProcessor.Data.Models
         public int machine_id { get; set; }
         public int ind_reg_iD { get; set; }
         public DateTime datetime_record { get; set; }
+        public bool is_processed { get; set; } = false;
     }
 }
