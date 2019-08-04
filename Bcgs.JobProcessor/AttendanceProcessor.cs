@@ -443,7 +443,7 @@ namespace Bcgs.JobProcessor
 
             if (signInData != null)
             {
-                logger.Info($"Record Date Time: {log.DateTimeRecord}, Student Name: {student.firstname} {student.lastname}, ID: {log.IndRegID}, Sign In: {signInData.SignIn}, Sign Out:{signInData.SignOut}, Is Sign In Log:{signInData.IsSignInLog}");
+                logger.Info($"Record Date Time: {log.DateTimeRecord}, Student Name: {student.firstname} {student.lastname}, ID: {log.IndRegID}, Sign In: {signInData.SignIn}, Sign Out: {signInData.SignOut}, Is Sign In Log: {signInData.IsSignInLog}");
 
                 var attendance = dbContext.StudentAttendences.Where(x => x.student_session_id == sessionId
                                 && x.date == processDate).FirstOrDefault();
@@ -454,7 +454,7 @@ namespace Bcgs.JobProcessor
                 {
 
 
-                    if (attendance.attendence_type_id == StudentAbsentTypeId && attendance.attendence_type_id != attTypeId)
+                    if (signInData.IsSignInLog)
                     {
                         attendance.attendence_type_id = attTypeId; //Present=1, Late=3
                         attendance.is_active = "yes";
