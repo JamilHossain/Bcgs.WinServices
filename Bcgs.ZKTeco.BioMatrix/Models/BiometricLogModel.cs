@@ -2,7 +2,7 @@
 
 namespace Bcgs.ZKTeco.BioMatrix.Models
 {
-    public class BioMatrixLog
+    public class BiometricLogModel
     {
         public int MachineNumber { get; set; }
         public int IndRegID { get; set; }

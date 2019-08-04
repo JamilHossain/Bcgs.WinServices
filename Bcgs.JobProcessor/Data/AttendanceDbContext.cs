@@ -73,7 +73,7 @@ namespace Bcgs.JobProcessor.Data
                 .HasForeignKey<int>(s => s.student_id);
 
             modelBuilder.Entity<BiometricLog>()
-                .ToTable("Biometric_log")
+                .ToTable("biometric_log")
                 .HasKey(e => e.id);
 
             modelBuilder.Entity<Staff>()

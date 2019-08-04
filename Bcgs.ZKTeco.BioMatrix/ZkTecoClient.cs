@@ -103,11 +103,11 @@ namespace Bcgs.ZKTeco.BioMatrix
         //        return lstMachineInfo;
         //}
 
-        public ICollection<BioMatrixLog> GetBiometricData()
+        public ICollection<BiometricLogModel> GetBiometricData()
         {
 
             IPAddress[] ipaddress = Dns.GetHostAddresses(this.HostName);
-            ICollection<BioMatrixLog> logs = new HashSet<BioMatrixLog>();
+            ICollection<BiometricLogModel> logs = new HashSet<BiometricLogModel>();
 
             if (ipaddress.Length > 0)
             {

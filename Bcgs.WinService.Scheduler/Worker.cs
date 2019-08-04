@@ -22,9 +22,6 @@ namespace Bcgs.WinService.Scheduler
         private bool isworking = false;
         internal void Start()
         {
-#if TRACE
-            //logger.Info( "Worker.Start");
-#endif
             logger.Info("Worker.Start");
 
             //Do Work

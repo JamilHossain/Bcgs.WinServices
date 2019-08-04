@@ -49,7 +49,7 @@ namespace Bcgs.ZKTeco.BioMatrix.Client
             return lstFPTemplates;
         }
 
-        public ICollection<BioMatrixLog> GetLogData(ZkemService objZkeeper, int machineNumber)
+        public ICollection<BiometricLogModel> GetLogData(ZkemService objZkeeper, int machineNumber)
         {
             string dwEnrollNumber1 = "";
             int dwVerifyMode = 0;
@@ -62,7 +62,7 @@ namespace Bcgs.ZKTeco.BioMatrix.Client
             int dwSecond = 0;
             int dwWorkCode = 0;
 
-            ICollection<BioMatrixLog> lstEnrollData = new List<BioMatrixLog>();
+            ICollection<BiometricLogModel> lstEnrollData = new List<BiometricLogModel>();
 
             objZkeeper.ReadAllGLogData(machineNumber);
 
@@ -72,7 +72,7 @@ namespace Bcgs.ZKTeco.BioMatrix.Client
             {
                 string inputDate = new DateTime(dwYear, dwMonth, dwDay, dwHour, dwMinute, dwSecond).ToString();
 
-                BioMatrixLog objInfo = new BioMatrixLog();
+                BiometricLogModel objInfo = new BiometricLogModel();
                 objInfo.MachineNumber = machineNumber;
                 objInfo.IndRegID = int.Parse(dwEnrollNumber1);
                 objInfo.DateTimeRecord1 = inputDate;
