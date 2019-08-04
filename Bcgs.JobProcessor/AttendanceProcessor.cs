@@ -22,6 +22,7 @@ namespace Bcgs.JobProcessor
         private DateTime SendAbsentSms_LastRunTime { get; set; } = DateTime.MinValue;
         private bool sentBiometricDeviceError = false;
         private string AdminPhoneNo = "8801711468016";
+        private DateTime DailyServiceCheckSMSDate = DateTime.MinValue;
 
         private bool IsBusy { get; set; } = false;
 
@@ -46,8 +47,55 @@ namespace Bcgs.JobProcessor
         public async void ExecuteAttendanceJobAsync()
         {
             this.InitializeDailyAttendanceProcess();
+            this.SendDailyServiceCheckSMS();
             this.ProcessDailyAttendanceLog();
             await this.SendDailyAbsentSms();
+        }
+
+        private void SendDailyServiceCheckSMS()
+        {
+            try
+            {
+                if(DateTime.Now.Hour == 7 && DailyServiceCheckSMSDate < DateTime.Now)
+                {
+                    if (this.AttendanceConfig.is_enable_sms_service)
+                    {
+                        string smsContent = "Attendance service running...";
+                        
+                        using (ZkTecoClient bioMatrixClient = new ZkTecoClient("basecampzkteco.ddns.net"))
+                        {
+                            try
+                            {
+                                bool isConnected = bioMatrixClient.ConnectToZKTeco();
+                                if(!isConnected)
+                                {
+                                    smsContent="Failed to connect to the biometric device";
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                smsContent="Failed to connect to the biometric device";
+                                logger.Error(ex.Message, ex);
+                            }
+                           
+                        }
+
+                        BasecampSMSSender smssender = new BasecampSMSSender("sazzadul.islam@asdbd.com", "abc987");
+
+                        string res = smssender.SendSms("8801714042726", smsContent);
+                        logger.Info($"SMS- {smsContent} {Environment.NewLine}Status: {res}");
+
+                        DailyServiceCheckSMSDate = DateTime.Now;
+
+
+                    }
+
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Error(ex.Message, ex);
+            }
         }
 
         private void InitializeDailyAttendanceProcess()
@@ -232,6 +280,8 @@ namespace Bcgs.JobProcessor
                             .Where(x => x.date == processDate && x.attendence_type_id == StudentAbsentTypeId)
                             .ToList();
 
+
+
                         foreach (var attendance in studentAttendences)
                         {
                             if (attendance.remark != "SMS sent.")
@@ -382,6 +432,7 @@ namespace Bcgs.JobProcessor
                     IsSignInLog = x.Min(y => y.datetime_record) == log.DateTimeRecord,
                     PunchCount = x.Count()
                 }).FirstOrDefault();
+            
 
             if (signInData != null)
             {
@@ -394,8 +445,11 @@ namespace Bcgs.JobProcessor
 
                 if (attendance != null)
                 {
-                    if (signInData.IsSignInLog)
+
+
+                    if (attendance.attendence_type_id == StudentAbsentTypeId && attendance.attendence_type_id != attTypeId  )
                     {
+                        allowToSendSMS = true;
                         attendance.attendence_type_id = attTypeId; //Present=1, Late=3
                         attendance.is_active = "yes";
                         attendance.created_at = signInData.SignIn;

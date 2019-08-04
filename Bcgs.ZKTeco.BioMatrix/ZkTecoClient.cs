@@ -69,6 +69,10 @@ namespace Bcgs.ZKTeco.BioMatrix
                     this.DeviceInfo = manipulator.FetchDeviceInfo(objZkeeper, this.MachineNumber);
 
                 }
+                else
+                {
+                    throw new Exception("Failed to connect to the biometric device at " + this.DeviceIP + ":" + this.PortNumber + "!");
+                }
 
             }
             catch (ZkTecoClientException ex)
