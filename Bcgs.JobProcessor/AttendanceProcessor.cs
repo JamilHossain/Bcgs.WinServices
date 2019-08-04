@@ -20,6 +20,7 @@ namespace Bcgs.JobProcessor
         private DateTime DailyProcess_LastRunTime { get; set; } = DateTime.MinValue;
         private DateTime ProcessAttendanceLog_LastRunTime { get; set; } = DateTime.MinValue;
         private DateTime SendAbsentSms_LastRunTime { get; set; } = DateTime.MinValue;
+        private DateTime DailyServiceCheckSMSDate = DateTime.MinValue;
 
         private bool IsBusy { get; set; } = false;
 
@@ -44,13 +45,61 @@ namespace Bcgs.JobProcessor
         public async void ExecuteAttendanceJobAsync()
         {
             this.InitializeDailyAttendanceProcess();
+            this.SendDailyServiceCheckSMS();
             this.ProcessDailyAttendanceLog();
             await this.SendDailyAbsentSms();
+        }
+
+        private void SendDailyServiceCheckSMS()
+        {
+            try
+            {
+                if(DateTime.Now.Hour == 7 && DailyServiceCheckSMSDate < DateTime.Now)
+                {
+                    if (this.AttendanceConfig.is_enable_sms_service)
+                    {
+                        string smsContent = "Attendance service running...";
+                        
+                        using (ZkTecoClient bioMatrixClient = new ZkTecoClient("basecampzkteco.ddns.net"))
+                        {
+                            try
+                            {
+                                bool isConnected = bioMatrixClient.ConnectToZKTeco();
+                                if(!isConnected)
+                                {
+                                    smsContent="Failed to connect to the biometric device";
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                smsContent="Failed to connect to the biometric device";
+                                logger.Error(ex.Message, ex);
+                            }
+                           
+                        }
+
+                        BasecampSMSSender smssender = new BasecampSMSSender("sazzadul.islam@asdbd.com", "abc987");
+
+                        string res = smssender.SendSms("8801714042726", smsContent);
+                        logger.Info($"SMS- {smsContent} {Environment.NewLine}Status: {res}");
+
+                        DailyServiceCheckSMSDate = DateTime.Now;
+
+
+                    }
+
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Error(ex.Message, ex);
+            }
         }
 
         private void InitializeDailyAttendanceProcess()
         {
 
+            
 
             if (!(DateTime.Now.Hour == 0
                 && this.DailyProcess_LastRunTime.Date < DateTime.Now.Date
@@ -61,7 +110,7 @@ namespace Bcgs.JobProcessor
 
 
             this.IsBusy = true;
-            logger.Info($"InitiateDailyAttendanceProcessAsync - Start Time: {DateTime.Now.ToString("MM/dd/yyyy h:mm:ss tt")}");
+            logger.Info($"InitiateDailyAttendanceProcessAsync - Start");
 
 
             this.DailyProcess_LastRunTime = DateTime.Now;
@@ -82,7 +131,7 @@ namespace Bcgs.JobProcessor
             finally
             {
                 this.IsBusy = false;
-                logger.Info($"InitiateDailyAttendanceProcessAsync - End Time: {DateTime.Now.ToString("MM/dd/yyyy h:mm:ss tt")}");
+                logger.Info($"InitiateDailyAttendanceProcessAsync - End");
             }
 
         }
@@ -101,7 +150,7 @@ namespace Bcgs.JobProcessor
                 return;
             }
 
-            logger.Info($"ProcessAttendanceLogAsync - Start Time: {DateTime.Now.ToString("MM/dd/yyyy h:mm:ss tt")}");
+            logger.Info($"ProcessAttendanceLogAsync - Start");
 
             this.IsBusy = true;
 
@@ -110,7 +159,7 @@ namespace Bcgs.JobProcessor
             DateTime lastProcessDate = DateTime.MinValue;
             try
             {
-                logger.Info($"GetBioMatrixData - Start Time: {DateTime.Now.ToString("MM/dd/yyyy h:mm:ss tt")}");
+                logger.Info($"GetBioMatrixData - Start");
 
                 ICollection<Bcgs.ZKTeco.BioMatrix.Models.BioMatrixLog> biomatrixLogData;
                 using (ZkTecoClient bioMatrixClient = new ZkTecoClient("basecampzkteco.ddns.net"))
@@ -118,7 +167,7 @@ namespace Bcgs.JobProcessor
                     biomatrixLogData = bioMatrixClient.GetBioMatrixData();
                 }
 
-                logger.Info($"GetBioMatrixData - End Time: {DateTime.Now.ToString("MM/dd/yyyy h:mm:ss tt")}");
+                logger.Info($"GetBioMatrixData - End");
 
                 //ICollection<Bcgs.ZKTeco.BioMatrix.Models.BioMatrixLog> biomatrixLogData = new HashSet<Bcgs.ZKTeco.BioMatrix.Models.BioMatrixLog>();
                 //biomatrixLogData.Add(new ZKTeco.BioMatrix.Models.BioMatrixLog
@@ -201,7 +250,7 @@ namespace Bcgs.JobProcessor
             finally
             {
                 this.IsBusy = false;
-                logger.Info($"ProcessAttendanceLogAsync - End Time: {DateTime.Now.ToString("MM/dd/yyyy h:mm:ss tt")}");
+                logger.Info($"ProcessAttendanceLogAsync - End");
 
             }
         }
@@ -215,7 +264,7 @@ namespace Bcgs.JobProcessor
                 return;
             }
 
-            logger.Info($"SendAbsentSms - Start Time: {DateTime.Now.ToString("MM/dd/yyyy h:mm:ss tt")}");
+            logger.Info($"SendAbsentSms - Start");
             this.SendAbsentSms_LastRunTime = DateTime.Now;
             this.IsBusy = true;
             DateTime processDate = DateTime.Now.Date;
@@ -231,6 +280,8 @@ namespace Bcgs.JobProcessor
                             .Include("StudentSession.Student")
                             .Where(x => x.date == processDate && x.attendence_type_id == StudentAbsentTypeId)
                             .ToList();
+
+
 
                         foreach (var attendance in studentAttendences)
                         {
@@ -258,7 +309,7 @@ namespace Bcgs.JobProcessor
             finally
             {
                 this.IsBusy = false;
-                logger.Info($"SendAbsentSms - End Time: {DateTime.Now.ToString("MM/dd/yyyy h:mm:ss tt")}");
+                logger.Info($"SendAbsentSms - End");
             }
         }
 
@@ -267,7 +318,7 @@ namespace Bcgs.JobProcessor
             DateTime processDate = DateTime.Now.Date;
             if (!dbContext.StaffAttendences.Any(x => x.date == processDate))
             {
-                logger.Info($"MakeStaffAbsent - Start Time: {DateTime.Now.ToString("MM/dd/yyyy h:mm:ss tt")}");
+                logger.Info($"MakeStaffAbsent - Start");
                 var staffs = dbContext.Staffs.Where(x => x.is_active > 0).ToList();
                 int attendance_type_id = GetAttendanceType(false, dbContext);
 
@@ -286,7 +337,7 @@ namespace Bcgs.JobProcessor
                 }
 
                 dbContext.SaveChanges();
-                logger.Info($"MakeStaffAbsent - End Time: {DateTime.Now.ToString("MM/dd/yyyy h:mm:ss tt")}");
+                logger.Info($"MakeStaffAbsent - End");
             }
         }
 
@@ -295,7 +346,7 @@ namespace Bcgs.JobProcessor
             DateTime processDate = DateTime.Now.Date;
             if (!dbContext.StudentAttendences.Any(x => x.date == processDate))
             {
-                logger.Info($"MakeStudentAbsent - Start Time: {DateTime.Now.ToString("MM/dd/yyyy h:mm:ss tt")}");
+                logger.Info($"MakeStudentAbsent - Start");
 
                 var students = dbContext.Students.Where(x => x.is_active == "yes")
                                    .Include(x => x.StudentSessions)
@@ -320,7 +371,7 @@ namespace Bcgs.JobProcessor
                 }
 
                 dbContext.SaveChanges();
-                logger.Info($"MakeStudentAbsent - End Time: {DateTime.Now.ToString("MM/dd/yyyy h:mm:ss tt")}");
+                logger.Info($"MakeStudentAbsent - End");
 
             }
 
@@ -359,6 +410,8 @@ namespace Bcgs.JobProcessor
 
         private bool UpdateStudentAttendanceStatus(ZKTeco.BioMatrix.Models.BioMatrixLog log, AttendanceDbContext dbContext)
         {
+            bool allowToSendSMS = false;
+
             DateTime processDate = DateTime.Now.Date;
             Student student = dbContext.Students.Where(x => x.admission_no == log.IndRegID)
                            .Include(x => x.StudentSessions)
@@ -379,10 +432,11 @@ namespace Bcgs.JobProcessor
                 {
                     RegId = x.Key,
                     SignIn = x.Min(y => y.datetime_record),
-                    SignOut = x.Count() > 1 ? x.Max(y => y.datetime_record) : DateTime.MinValue,
+                    SignOut = x.Count() > 1 ? x.Max(y => y.datetime_record) : DateTime.Now,
                     IsSignInLog = x.Count() == 1,
                     PunchCount = x.Count()
                 }).FirstOrDefault();
+            
 
             if (signInData != null)
             {
@@ -393,8 +447,11 @@ namespace Bcgs.JobProcessor
 
                 if (attendance != null)
                 {
-                    if (signInData.IsSignInLog)
+
+
+                    if (attendance.attendence_type_id == StudentAbsentTypeId && attendance.attendence_type_id != attTypeId  )
                     {
+                        allowToSendSMS = true;
                         attendance.attendence_type_id = attTypeId; //Present=1, Late=3
                         attendance.is_active = "yes";
                         attendance.created_at = signInData.SignIn;
@@ -424,7 +481,7 @@ namespace Bcgs.JobProcessor
 
                 }
 
-                if (signInData.IsSignInLog)
+                if (allowToSendSMS)
                 {
                     if (this.SendSms(attTypeId == StudentPresentTypeId ? SmsType.Present : SmsType.Late, student, log.DateTimeRecord))
                     {

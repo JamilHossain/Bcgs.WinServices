@@ -61,7 +61,7 @@ namespace Bcgs.ZKTeco.BioMatrix
                     isValidIpA = UniversalStatic.PingTheDevice(this.DeviceIP);
 
                     if (!isValidIpA)
-                        throw new Exception("The device at " + this.DeviceIP + ":" + this.PortNumber + " did not respond!!");
+                        throw new Exception("The device at " + this.DeviceIP + ":" + this.PortNumber + " did not respond!");
                 }
                 objZkeeper = new ZkemService(RaiseDeviceEvent);
                 IsDeviceConnected = objZkeeper.Connect_Net(this.DeviceIP, this.PortNumber);
@@ -70,6 +70,10 @@ namespace Bcgs.ZKTeco.BioMatrix
                 {
                     this.DeviceInfo = manipulator.FetchDeviceInfo(objZkeeper, this.MachineNumber);
 
+                }
+                else
+                {
+                    throw new Exception("Failed to connect to the biometric device at " + this.DeviceIP + ":" + this.PortNumber + "!");
                 }
 
             }
