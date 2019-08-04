@@ -56,28 +56,30 @@ namespace Bcgs.JobProcessor
         {
             try
             {
-                if(DateTime.Now.Hour == 7 && DailyServiceCheckSMSDate < DateTime.Now)
+                if (DateTime.Now.Hour == 7 && DailyServiceCheckSMSDate < DateTime.Now)
                 {
+                    this.IsBusy = true;
+
                     if (this.AttendanceConfig.is_enable_sms_service)
                     {
                         string smsContent = "Attendance service running...";
-                        
+
                         using (ZkTecoClient bioMatrixClient = new ZkTecoClient("basecampzkteco.ddns.net"))
                         {
                             try
                             {
                                 bool isConnected = bioMatrixClient.ConnectToZKTeco();
-                                if(!isConnected)
+                                if (!isConnected)
                                 {
-                                    smsContent="Failed to connect to the biometric device";
+                                    smsContent = "Failed to connect to the biometric device";
                                 }
                             }
                             catch (Exception ex)
                             {
-                                smsContent="Failed to connect to the biometric device";
+                                smsContent = "Failed to connect to the biometric device";
                                 logger.Error(ex.Message, ex);
                             }
-                           
+
                         }
 
                         BasecampSMSSender smssender = new BasecampSMSSender("sazzadul.islam@asdbd.com", "abc987");
@@ -95,6 +97,9 @@ namespace Bcgs.JobProcessor
             catch (Exception ex)
             {
                 logger.Error(ex.Message, ex);
+            }
+            finally {
+                this.IsBusy = false;
             }
         }
 
@@ -449,7 +454,6 @@ namespace Bcgs.JobProcessor
 
                     if (attendance.attendence_type_id == StudentAbsentTypeId && attendance.attendence_type_id != attTypeId  )
                     {
-                        allowToSendSMS = true;
                         attendance.attendence_type_id = attTypeId; //Present=1, Late=3
                         attendance.is_active = "yes";
                         attendance.created_at = signInData.SignIn;
@@ -585,12 +589,17 @@ namespace Bcgs.JobProcessor
 
         private bool SendServiceStetusSms(string msg)
         {
-            BasecampSMSSender smssender = new BasecampSMSSender("sazzadul.islam@asdbd.com", "abc987");
+            if (this.AttendanceConfig.is_enable_sms_service)
+            {
+                BasecampSMSSender smssender = new BasecampSMSSender("sazzadul.islam@asdbd.com", "abc987");
 
-            string res = smssender.SendSms(AdminPhoneNo, msg);
-            logger.Info($"SMS Notification {Environment.NewLine} {msg} {Environment.NewLine}Status: {res} {Environment.NewLine}");
+                string res = smssender.SendSms(AdminPhoneNo, msg);
+                logger.Info($"SMS Notification {Environment.NewLine} {msg} {Environment.NewLine}Status: {res} {Environment.NewLine}");
 
-            return res.Contains("200");
+                return res.Contains("200");
+            }
+
+            return false;
         }
 
         private string PrepareSmsContent(SmsType smsType, Student student, DateTime dateTimeRecord)
