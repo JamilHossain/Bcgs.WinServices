@@ -20,7 +20,7 @@ namespace Bcgs.JobProcessor
         private DateTime DailyProcess_LastRunTime { get; set; } = DateTime.MinValue;
         private DateTime ProcessAttendanceLog_LastRunTime { get; set; } = DateTime.MinValue;
         private DateTime SendAbsentSms_LastRunTime { get; set; } = DateTime.MinValue;
-        private bool sentBiometricDeviceError = false;
+        private bool SentBiometricDeviceError = false;
         private string AdminPhoneNo = "8801711468016";
         private DateTime DailyServiceCheckSMSDate = DateTime.MinValue;
 
@@ -98,7 +98,8 @@ namespace Bcgs.JobProcessor
             {
                 logger.Error(ex.Message, ex);
             }
-            finally {
+            finally
+            {
                 this.IsBusy = false;
             }
         }
@@ -173,7 +174,7 @@ namespace Bcgs.JobProcessor
                 using (ZkTecoClient biometricClient = new ZkTecoClient("basecampzkteco.ddns.net"))
                 {
                     biometricLogData = biometricClient.GetBiometricData();
-                    sentBiometricDeviceError = false;
+                    SentBiometricDeviceError = false;
                 }
 
                 logger.Info("Get Biometric Data - End");
@@ -233,14 +234,14 @@ namespace Bcgs.JobProcessor
                     {
                         logger.Info(ex.Message, ex);
                     }
-                   
+
                 }
             }
             catch (ZkTecoClientException ex)
             {
-                if (!this.sentBiometricDeviceError)
+                if (!this.SentBiometricDeviceError)
                 {
-                    this.sentBiometricDeviceError = true;
+                    this.SentBiometricDeviceError = true;
                     this.SendServiceStetusSms(ex.Message);
                 }
 
@@ -267,15 +268,15 @@ namespace Bcgs.JobProcessor
             {
                 return;
             }
-
-            logger.Info($"Send Absent Sms - Start".ToUpper());
-            this.SendAbsentSms_LastRunTime = DateTime.Now;
-            this.IsBusy = true;
-            DateTime processDate = DateTime.Now.Date;
-            try
+            if (this.AttendanceConfig.is_enable_sms_service)
             {
-                if (this.AttendanceConfig.is_enable_sms_service)
+                logger.Info($"Send Absent Sms - Start".ToUpper());
+                this.SendAbsentSms_LastRunTime = DateTime.Now;
+                this.IsBusy = true;
+                DateTime processDate = DateTime.Now.Date;
+                try
                 {
+
 
                     using (AttendanceDbContext dbContext = new AttendanceDbContext())
                     {
@@ -304,16 +305,17 @@ namespace Bcgs.JobProcessor
 
                         await dbContext.SaveChangesAsync();
                     }
+
                 }
-            }
-            catch (Exception ex)
-            {
-                logger.Error(ex.Message, ex);
-            }
-            finally
-            {
-                this.IsBusy = false;
-                logger.Info($"Send Absent Sms - End".ToUpper());
+                catch (Exception ex)
+                {
+                    logger.Error(ex.Message, ex);
+                }
+                finally
+                {
+                    this.IsBusy = false;
+                    logger.Info($"Send Absent Sms - End".ToUpper());
+                }
             }
         }
 
@@ -437,7 +439,7 @@ namespace Bcgs.JobProcessor
                     IsSignInLog = x.Min(y => y.datetime_record) == log.DateTimeRecord,
                     PunchCount = x.Count()
                 }).FirstOrDefault();
-            
+
 
             if (signInData != null)
             {
@@ -452,7 +454,7 @@ namespace Bcgs.JobProcessor
                 {
 
 
-                    if (attendance.attendence_type_id == StudentAbsentTypeId && attendance.attendence_type_id != attTypeId  )
+                    if (attendance.attendence_type_id == StudentAbsentTypeId && attendance.attendence_type_id != attTypeId)
                     {
                         attendance.attendence_type_id = attTypeId; //Present=1, Late=3
                         attendance.is_active = "yes";

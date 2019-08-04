@@ -30,6 +30,13 @@ namespace Bcgs.ZKTeco.BioMatrix
             this.PortNumber = portNumber;
             this.MachineNumber = machineNumber;
 
+            IPAddress[] ipaddress = Dns.GetHostAddresses(this.HostName);
+           
+            if (ipaddress.Length > 0)
+            {
+                this.DeviceIP = ipaddress[0].ToString();
+            }
+
         }
 
         public bool ConnectToZKTeco()
@@ -110,13 +117,13 @@ namespace Bcgs.ZKTeco.BioMatrix
         public ICollection<BiometricLogModel> GetBiometricData()
         {
 
-            IPAddress[] ipaddress = Dns.GetHostAddresses(this.HostName);
+            //IPAddress[] ipaddress = Dns.GetHostAddresses(this.HostName);
             ICollection<BiometricLogModel> logs = new HashSet<BiometricLogModel>();
 
-            if (ipaddress.Length > 0)
-            {
-                this.DeviceIP = ipaddress[0].ToString();
-            }
+            //if (ipaddress.Length > 0)
+            //{
+            //    this.DeviceIP = ipaddress[0].ToString();
+            //}
 
             if (this.ConnectToZKTeco())
             {
